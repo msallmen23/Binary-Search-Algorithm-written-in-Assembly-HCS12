@@ -1,0 +1,360 @@
+;Assembly Source code for the Binary searching algorithm final project for microprocessors
+;Wrtten by Michael Jordan Sallmen
+  
+ORG  $4000      ;Flash ROM address for Dragon12+
+           LDS  #$4000  
+Entry:
+
+delayCount EQU  $3500 
+segOne     EQU  $3000      ;Leftmost segment
+           LDAA #$3F
+           STAA segOne     ;Stores 0 output into left display
+segTwo     EQU  $3002      ;Second
+segThree   EQU  $3004      ;Third
+segFour    EQU  $3006      ;Rightmost segment
+
+disMem     EQU  $3010      ;7-segment output table
+           LDX  #$3010
+           LDAA #$3F
+           STAA 0,X
+           LDAA #$06
+           STAA 1,X
+           LDAA #$5B
+           STAA 2,X
+           LDAA #$4F
+           STAA 3,X
+           LDAA #$66
+           STAA 4,X
+           LDAA #$6D
+           STAA 5,X
+           LDAA #$7D
+           STAA 6,X
+           LDAA #$33
+           STAA 7,X
+           LDAA #$7F
+           STAA 8,X
+           LDAA #$6F
+           STAA 9,X         
+           LDAA #$77        ;A
+           STAA 10,X        
+           LDAA #$7C        ;B
+           STAA 11,X
+           LDAA #$39        ;C
+           STAA 12,X
+           LDAA #$5E        ;D
+           STAA 13,X
+           LDAA #$79        ;E
+           STAA 14,X
+           LDAA #$71        ;F
+           STAA 15,X
+         
+
+COUNT EQU  $2500
+      LDAB #50
+      STAB COUNT 
+      CLRB
+          
+Xval  EQU  $2000 
+      LDD  #10             ;Set Xval here: (Value that is used in array creation)
+      STD  Xval            ;D is stored in Xval
+      LDX  #$2000          ;Used to hold array offset + starting point
+      LDY  #$2000          ;Used to hold array minimum address     
+      
+fillArray                  ;Fills the array
+     
+      DEC  COUNT           ;Decreases
+      STD  0,X
+      INX                  ;Increments index register
+      INX
+      ADDD Xval            ;Adds (value in D) + Xval
+      
+      TST  COUNT           ;Compares COUNT to zero
+      LBGT fillArray       ;Branches if COUNT is greater that zero
+      
+      CLRA
+      CLRB
+      
+Yval  EQU  $1606                   
+      LDD  #69             ;Set Yval here: (Value that we are searching the array for)      
+      STD  Yval             
+Max   EQU  $1600           ;Max bound
+      STX  Max
+Min   EQU  $1602           ;Min bound
+      STY  Min
+Mean  EQU  $1604           ;Average (Midpoint)
+
+
+      LDD  Yval            ;Checks for values not divisible by Xval
+      TFR  X,Y
+      LDX  Xval
+      IDIV              
+      CPD  #0
+      LBNE valueNotInArray
+      
+      
+      LDD  Max             ;Checks to see if Yval is below the Min or above the Max value of the array
+      TFR  D,X
+      DEX                  ;The DEX instructions moves the location from the maximum bound, to two bytes before it
+      DEX
+      LDD  X
+      CPD  Yval
+      LBLO valueNotInArray
+      LDD  Min
+      TFR  D,X
+      LDD  X
+      CPD  Yval
+      LBGT valueNotInArray
+                
+      TFR  Y,X          
+      
+
+meanCalc
+      CPD  Yval
+      LBEQ foundValue
+      CLRA      
+      CLRB
+      LDD  Min             ;Loads minimum value into D
+      ADDD Max
+      LSRD                 ;Divides D by 2
+
+fixByte
+      TFR  D,X             ;Stores the memory location in D to X
+      LDD  X               ;Loads D with the value in memory location X      
+     
+      CMPB #0
+      LBEQ  check
+      CMPB #1
+      LBEQ  check
+     
+      
+      STD  Mean            ;Stores D value in mean 
+
+byteReturn
+      LDY  #$3010
+      CMPA #$1
+      LBNE skip
+      INY
+      LDD  Y  
+      STAA segTwo          ;Sets 7-seg digit 2
+      JMP  ab
+skip  
+      LDY  #$3010
+      LDD  Y
+      STAA segTwo
+
+ab                          ;Sets 7-seg digits 3 and 4
+init  EQU  $2506
+      LDD  Mean
+      CMPB #15             ;Sets 7-seg digits 3 and 4 if less than 15
+      LBHI set
+      LDAA #$3F
+      STAA segThree
+      LDY  #$3010
+      ABY
+      LDD  Y
+      STAA segFour
+      JMP  binarySearch
+      
+set                        ;Case if greater than 15
+      LDD  Mean
+temp  EQU  $1100            ;Non-shifted B
+      STAB temp
+      LSRB
+      LSRB
+      LSRB
+      LSRB
+tempB EQU  $1150
+      STAB tempB           ;Shifted B 
+      LDY  #$3010
+      ABY
+      LDD  Y
+      STAA segThree
+      LDAA #16
+      LDAB tempB
+      MUL                  ;Multiply B and A 
+tot   EQU  $1200
+      STD  tot            
+      LDD  Mean
+      SUBD tot             ;Subtracts to retrieve rightmost digit
+      LDY  #$3010
+      ABY
+      LDD  Y
+      STAA segFour      
+      JMP  binarySearch
+      
+      
+binarySearch               ;Binary Search function that traverses the array to find the y-value input
+        
+      JMP  sevenSegmentDisplay 
+binRet
+      LDD  Mean
+      CPD  Yval            ;Compares D(contains mean) to the y-value(number searching for)                           
+      LBLO searchHigher    ;The mean is less than the y-value being searched for
+      LBGT searchLower     ;The mean is greater than the y-value being searched for
+      LBEQ foundValue      ;Current mean value is the y-value, moves out of binary search
+      JMP  valueNotInArray ;Value is not found in Array, jumps out of binary search
+      
+searchHigher
+      INX
+      INX
+      STX  Min             ;Sets Minimum bound
+     
+      JMP  meanCalc
+      
+searchLower  
+      DEX
+      DEX
+      STX  Max             ;Sets Maximum bound
+        
+      JMP  meanCalc
+      
+check
+      DEX
+      LDD  X
+      STD  Mean
+      JMP  byteReturn     
+      
+      
+foundValue             
+      
+      LDAA #$FF            ;set-up for 7-segment
+      STAA DDRB
+      LDAA #$FF
+      STAA DDRP
+      
+      LDAA #$0E            ;Left Most Digit
+      STAA PTP
+      LDAA segOne
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$0D            ;Second From Left Digit
+      STAA PTP
+      LDAA segTwo 
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$0B            ;Third From Left Digit
+      STAA PTP
+      LDAA segThree
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$07            ;Right Most Digit
+      STAA PTP
+      LDAA segFour
+      STAA PORTB 
+      JSR  delayMS
+ 
+      JMP  foundValue      ;Infinite loop for found value
+      
+
+valueNotInArray
+    
+loopInfinite        
+      
+      LDAA #$FF            ;set-up for 7-segment
+      STAA DDRB
+      LDAA #$FF
+      STAA DDRP
+      
+      LDAA #$0E            ;Left Most Digit
+      STAA PTP
+      LDAA #$3F
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$0D            ;Second From Left Digit
+      STAA PTP
+      LDAA #$79 
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$0B            ;Third From Left Digit
+      STAA PTP
+      LDAA #$33
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$07            ;Right Most Digit
+      STAA PTP
+      LDAA #$33
+      STAA PORTB 
+      JSR  delayMS
+ 
+      JMP  loopInfinite
+              
+sevenSegmentDisplay        ;7-segment display loop   
+      
+      LDAA #100            ;Loop time control: Higher value will operate loop longer
+      STAA delayCount
+      
+      CLRA
+      CLRB
+
+loop1                    
+       
+      LDAA #$FF            ;set-up for 7-segment
+      STAA DDRB
+      LDAA #$FF
+      STAA DDRP
+      
+      LDAA #$0E            ;Displays Left Most Digit
+      STAA PTP
+      LDAA segOne
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$0D            ;Display Second From Left Digit
+      STAA PTP
+      LDAA segTwo      
+      STAA PORTB
+      JSR  delayMS
+        
+      LDAA #$0B            ;Display Third From Left Digit
+      STAA PTP     
+      LDAA segThree
+      STAA PORTB 
+      JSR  delayMS
+      
+      LDAA #$07            ;Displays Right Most Digit
+      STAA PTP
+      LDAA segFour
+      STAA PORTB 
+      JSR  delayMS
+ 
+      DEC  delayCount
+      LDAA delayCount
+      CMPA #0
+      LBNE loop1
+      LBRA binRet
+              
+                   
+delayMS                    ;1ms delay function
+      CLRA
+      LDD  #16000
+MEMO  EQU  $1000
+      STD  MEMO
+      CLRA
+      CLRB
+      JSR  DELAY
+        
+      RTS
+        
+      ORG  $6000    
+DELAY
+      PSHD
+      PULD
+      INCA
+      DECA
+      ADDD #2
+      CPD  MEMO 
+      BLT  DELAY
+        
+      RTS
+
+end   
+      
+      END
+
+
